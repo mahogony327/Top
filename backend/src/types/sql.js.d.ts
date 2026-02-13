@@ -19,6 +19,7 @@ declare module 'sql.js' {
     prepare(sql: string): Statement;
     export(): Uint8Array;
     close(): void;
+    getRowsModified(): number;
   }
 
   export class Statement {
