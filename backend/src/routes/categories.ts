@@ -18,7 +18,7 @@ const createCategorySchema = z.object({
 });
 
 // GET /api/categories - List user's categories
-router.get('/', authMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const categories = await db.prepare(`
@@ -52,7 +52,7 @@ router.get('/', authMiddleware, (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/categories - Create category
-router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
+router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const validation = createCategorySchema.safeParse(req.body);
     if (!validation.success) {
@@ -98,7 +98,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/categories/:id - Get category with submissions
-router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/:id', optionalAuthMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const category = await db.prepare(`
@@ -167,7 +167,7 @@ router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => 
 });
 
 // PUT /api/categories/:id - Update category
-router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
+router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const category = await db.prepare('SELECT * FROM categories WHERE id = ? AND user_id = ?')
@@ -237,7 +237,7 @@ router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/categories/:id - Delete category
-router.delete('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const category = await db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?')

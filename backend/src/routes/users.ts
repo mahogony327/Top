@@ -6,7 +6,7 @@ import { authMiddleware, optionalAuthMiddleware, AuthRequest } from '../middlewa
 const router = Router();
 
 // GET /api/users/:username - Get user profile
-router.get('/:username', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/:username', optionalAuthMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const user = await db.prepare(`
@@ -81,7 +81,7 @@ router.get('/:username', optionalAuthMiddleware, (req: AuthRequest, res: Respons
 });
 
 // POST /api/users/:username/follow - Follow user
-router.post('/:username/follow', authMiddleware, (req: AuthRequest, res: Response) => {
+router.post('/:username/follow', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const targetUser = await db.prepare('SELECT id, username FROM users WHERE username = ?')
@@ -117,7 +117,7 @@ router.post('/:username/follow', authMiddleware, (req: AuthRequest, res: Respons
 });
 
 // DELETE /api/users/:username/follow - Unfollow user
-router.delete('/:username/follow', authMiddleware, (req: AuthRequest, res: Response) => {
+router.delete('/:username/follow', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const targetUser = await db.prepare('SELECT id FROM users WHERE username = ?')
@@ -144,7 +144,7 @@ router.delete('/:username/follow', authMiddleware, (req: AuthRequest, res: Respo
 });
 
 // GET /api/users/:username/followers - Get followers
-router.get('/:username/followers', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/:username/followers', optionalAuthMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const user = await db.prepare('SELECT id, is_private FROM users WHERE username = ?')
@@ -183,7 +183,7 @@ router.get('/:username/followers', optionalAuthMiddleware, (req: AuthRequest, re
 });
 
 // GET /api/users/:username/following - Get following
-router.get('/:username/following', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/:username/following', optionalAuthMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const user = await db.prepare('SELECT id, is_private FROM users WHERE username = ?')

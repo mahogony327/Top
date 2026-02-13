@@ -27,7 +27,7 @@ const reorderSchema = z.object({
 });
 
 // POST /api/submissions - Create submission
-router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
+router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const validation = createSubmissionSchema.safeParse(req.body);
     if (!validation.success) {
@@ -95,7 +95,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/submissions/:id - Get submission details
-router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/:id', optionalAuthMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const submission = await db.prepare(`
@@ -172,7 +172,7 @@ router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => 
 });
 
 // PUT /api/submissions/:id - Update submission
-router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
+router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const submission = await db.prepare(`
@@ -241,7 +241,7 @@ router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/submissions/:id - Soft delete submission
-router.delete('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const submission = await db.prepare(`
@@ -272,7 +272,7 @@ router.delete('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/submissions/deleted - Get recently deleted submissions
-router.get('/deleted/list', authMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/deleted/list', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const deleted = await db.prepare(`
@@ -300,7 +300,7 @@ router.get('/deleted/list', authMiddleware, (req: AuthRequest, res: Response) =>
 });
 
 // POST /api/submissions/:id/restore - Restore deleted submission
-router.post('/:id/restore', authMiddleware, (req: AuthRequest, res: Response) => {
+router.post('/:id/restore', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const submission = await db.prepare(`
@@ -344,7 +344,7 @@ router.post('/:id/restore', authMiddleware, (req: AuthRequest, res: Response) =>
 });
 
 // DELETE /api/submissions/:id/permanent - Permanently delete
-router.delete('/:id/permanent', authMiddleware, (req: AuthRequest, res: Response) => {
+router.delete('/:id/permanent', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const submission = await db.prepare(`
@@ -368,7 +368,7 @@ router.delete('/:id/permanent', authMiddleware, (req: AuthRequest, res: Response
 });
 
 // POST /api/submissions/reorder - Reorder submissions in a category
-router.post('/reorder', authMiddleware, (req: AuthRequest, res: Response) => {
+router.post('/reorder', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const validation = reorderSchema.safeParse(req.body);
     if (!validation.success) {
@@ -393,14 +393,11 @@ router.post('/reorder', authMiddleware, (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Update ranks in transaction
-    const updateStmt = await db.prepare('UPDATE submissions SET rank = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-    const updateMany = db.transaction((items: { id: string; rank: number }[]) => {
-      for (const item of items) {
-        updateStmt.run(item.rank, item.id);
-      }
-    });
-    updateMany(submissions);
+    // Update ranks
+    for (const item of submissions) {
+      await db.prepare('UPDATE submissions SET rank = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(item.rank, item.id);
+    }
 
     res.json({ message: 'Submissions reordered successfully' });
   } catch (error) {
@@ -410,7 +407,7 @@ router.post('/reorder', authMiddleware, (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/submissions/:id/like - Like a submission
-router.post('/:id/like', authMiddleware, (req: AuthRequest, res: Response) => {
+router.post('/:id/like', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     
@@ -452,7 +449,7 @@ router.post('/:id/like', authMiddleware, (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/submissions/:id/like - Unlike a submission
-router.delete('/:id/like', authMiddleware, (req: AuthRequest, res: Response) => {
+router.delete('/:id/like', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const result = await db.prepare('DELETE FROM likes WHERE submission_id = ? AND user_id = ?')
@@ -471,7 +468,7 @@ router.delete('/:id/like', authMiddleware, (req: AuthRequest, res: Response) => 
 });
 
 // POST /api/submissions/:id/comments - Add comment
-router.post('/:id/comments', authMiddleware, (req: AuthRequest, res: Response) => {
+router.post('/:id/comments', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const commentSchema = z.object({
       content: z.string().min(1).max(1000)

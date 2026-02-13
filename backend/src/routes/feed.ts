@@ -5,7 +5,7 @@ import { optionalAuthMiddleware, authMiddleware, AuthRequest } from '../middlewa
 const router = Router();
 
 // GET /api/feed/trending - Get trending submissions
-router.get('/trending', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/trending', optionalAuthMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const period = req.query.period as string || 'week';
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
@@ -69,7 +69,7 @@ router.get('/trending', optionalAuthMiddleware, (req: AuthRequest, res: Response
 });
 
 // GET /api/feed/following - Get feed from followed users
-router.get('/following', authMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/following', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const offset = parseInt(req.query.offset as string) || 0;
@@ -117,7 +117,7 @@ router.get('/following', authMiddleware, (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/feed/discover - Discover new categories
-router.get('/discover', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/discover', optionalAuthMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
 
@@ -163,7 +163,7 @@ router.get('/discover', optionalAuthMiddleware, (req: AuthRequest, res: Response
 });
 
 // GET /api/feed/search - Search submissions and categories
-router.get('/search', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/search', optionalAuthMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const query = req.query.q as string;
     const type = req.query.type as string || 'all';
