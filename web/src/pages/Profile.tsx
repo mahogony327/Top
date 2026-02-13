@@ -29,7 +29,7 @@ interface UserProfile {
 
 export default function Profile() {
   const { username } = useParams<{ username: string }>();
-  const { user } = useAuth();
+  const { } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
