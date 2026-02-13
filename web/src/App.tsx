@@ -15,6 +15,7 @@ import CreateCategory from './pages/CreateCategory';
 import Profile from './pages/Profile';
 import Discover from './pages/Discover';
 import Settings from './pages/Settings';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -54,6 +55,7 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
       
