@@ -1,8 +1,8 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-// Change this to your backend URL
-const API_URL = 'http://localhost:3001/api';
+// Production backend URL
+const API_URL = 'https://top-production-1874.up.railway.app/api';
 
 const api = axios.create({
   baseURL: API_URL,

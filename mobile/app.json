@@ -31,7 +31,16 @@
     "scheme": "top",
     "plugins": [
       "expo-router",
-      "expo-secure-store"
-    ]
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "5da93d72-ad0b-44b4-b419-d66796c4a58e"
+      }
+    }
   }
 }
