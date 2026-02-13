@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+const API_URL = import.meta.env.PROD 
+  ? 'https://top-production-1874.up.railway.app/api'
+  : 'http://localhost:3001/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json'
   }
