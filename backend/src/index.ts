@@ -45,15 +45,23 @@ app.use(express.urlencoded({ extended: true }));
 
 // Initialize database and start server
 async function start() {
-  await initializeDatabase();
+  console.log('Starting server...');
+  console.log('PORT:', PORT);
   
-  app.listen(PORT, () => {
-    console.log(`🚀 Top API server running on http://localhost:${PORT}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-  });
+  try {
+    await initializeDatabase();
+    
+    app.listen(PORT, () => {
+      console.log(`🚀 Top API server running on port ${PORT}`);
+      console.log(`📊 Health check: /api/health`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 }
 
-start().catch(console.error);
+start();
 
 // Health check
 app.get('/api/health', (req, res) => {

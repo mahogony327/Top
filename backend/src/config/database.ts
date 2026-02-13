@@ -5,6 +5,8 @@ import path from 'path';
 let db: SqlJsDatabase | null = null;
 let dbPath: string = '';
 
+console.log('Loading database module...');
+
 // Wrapper to make sql.js API similar to better-sqlite3
 class DatabaseWrapper {
   private db: SqlJsDatabase;
@@ -75,7 +77,11 @@ function save() {
 let dbWrapper: DatabaseWrapper | null = null;
 
 export async function initializeDatabase(): Promise<void> {
-  const SQL = await initSqlJs();
+  console.log('Initializing sql.js...');
+  const SQL = await initSqlJs({
+    locateFile: (file: string) => `https://sql.js.org/dist/${file}`
+  });
+  console.log('sql.js loaded successfully');
   
   const dataDir = path.join(process.cwd(), 'data');
   if (!fs.existsSync(dataDir)) {
