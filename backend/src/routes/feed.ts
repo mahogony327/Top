@@ -10,19 +10,19 @@ router.get('/trending', optionalAuthMiddleware, async (req: AuthRequest, res: Re
     const period = req.query.period as string || 'week';
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
 
-    let dateFilter: string;
+    let intervalDays: number;
     switch (period) {
       case 'day':
-        dateFilter = "datetime('now', '-1 day')";
+        intervalDays = 1;
         break;
       case 'month':
-        dateFilter = "datetime('now', '-30 days')";
+        intervalDays = 30;
         break;
       case 'year':
-        dateFilter = "datetime('now', '-365 days')";
+        intervalDays = 365;
         break;
       default: // week
-        dateFilter = "datetime('now', '-7 days')";
+        intervalDays = 7;
     }
 
     const db = getDb();
@@ -37,12 +37,12 @@ router.get('/trending', optionalAuthMiddleware, async (req: AuthRequest, res: Re
       FROM submissions s
       JOIN categories c ON s.category_id = c.id
       JOIN users u ON c.user_id = u.id
-      LEFT JOIN likes l ON s.id = l.submission_id AND l.created_at > ${dateFilter}
-      WHERE c.is_private = 0
-      GROUP BY s.id
+      LEFT JOIN likes l ON s.id = l.submission_id AND l.created_at > NOW() - INTERVAL '1 day' * ?
+      WHERE c.is_private = 0 AND s.deleted_at IS NULL
+      GROUP BY s.id, s.title, s.description, s.image_url, s.created_at, c.id, c.name, u.id, u.username, u.display_name, u.avatar_url
       ORDER BY like_count DESC, s.created_at DESC
       LIMIT ?
-    `).all(limit) as any[];
+    `).all(intervalDays, limit) as any[];
 
     res.json(trending.map(t => ({
       id: t.id,
@@ -132,10 +132,10 @@ router.get('/discover', optionalAuthMiddleware, async (req: AuthRequest, res: Re
         (SELECT COUNT(*) FROM likes l JOIN submissions s2 ON l.submission_id = s2.id WHERE s2.category_id = c.id) as total_likes
       FROM categories c
       JOIN users u ON c.user_id = u.id
-      LEFT JOIN submissions s ON s.category_id = c.id
+      LEFT JOIN submissions s ON s.category_id = c.id AND s.deleted_at IS NULL
       WHERE c.is_private = 0
-      GROUP BY c.id
-      HAVING submission_count > 0
+      GROUP BY c.id, c.name, c.description, c.icon, c.color, c.created_at, u.id, u.username, u.display_name, u.avatar_url
+      HAVING COUNT(DISTINCT s.id) > 0
       ORDER BY total_likes DESC, c.created_at DESC
       LIMIT ?
     `).all(limit) as any[];
