@@ -26,7 +26,7 @@ export const verifyToken = (token: string): JWTPayload => {
   return jwt.verify(token, JWT_SECRET) as JWTPayload;
 };
 
-export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -41,7 +41,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     
     // Verify user still exists
     const db = getDb();
-    const user = db.prepare('SELECT id, email, username FROM users WHERE id = ?').get(decoded.userId) as any;
+    const user = await db.prepare('SELECT id, email, username FROM users WHERE id = ?').get(decoded.userId) as any;
     
     if (!user) {
       res.status(401).json({ error: 'User no longer exists.' });
@@ -61,7 +61,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
 };
 
 // Optional auth - doesn't fail if no token, but adds user if present
-export const optionalAuthMiddleware = (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const optionalAuthMiddleware = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -74,7 +74,7 @@ export const optionalAuthMiddleware = (req: AuthRequest, res: Response, next: Ne
   try {
     const decoded = verifyToken(token);
     const db = getDb();
-    const user = db.prepare('SELECT id, email, username FROM users WHERE id = ?').get(decoded.userId) as any;
+    const user = await db.prepare('SELECT id, email, username FROM users WHERE id = ?').get(decoded.userId) as any;
     
     if (user) {
       req.user = {
