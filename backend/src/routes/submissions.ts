@@ -39,7 +39,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
     const db = getDb();
 
     // Verify category ownership
-    const category = db.prepare('SELECT id, max_items FROM categories WHERE id = ? AND user_id = ?')
+    const category = await db.prepare('SELECT id, max_items FROM categories WHERE id = ? AND user_id = ?')
       .get(categoryId, req.user!.id) as any;
 
     if (!category) {
@@ -48,7 +48,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
     }
 
     // Check max items
-    const currentCount = db.prepare('SELECT COUNT(*) as count FROM submissions WHERE category_id = ?')
+    const currentCount = await db.prepare('SELECT COUNT(*) as count FROM submissions WHERE category_id = ?')
       .get(categoryId) as any;
     
     if (currentCount.count >= category.max_items) {
@@ -59,17 +59,17 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
     // Calculate rank if not provided
     let finalRank = rank;
     if (!finalRank) {
-      const maxRank = db.prepare('SELECT MAX(rank) as max FROM submissions WHERE category_id = ?')
+      const maxRank = await db.prepare('SELECT MAX(rank) as max FROM submissions WHERE category_id = ?')
         .get(categoryId) as any;
       finalRank = (maxRank.max || 0) + 1;
     } else {
       // Shift existing ranks if inserting
-      db.prepare('UPDATE submissions SET rank = rank + 1 WHERE category_id = ? AND rank >= ?')
+      await db.prepare('UPDATE submissions SET rank = rank + 1 WHERE category_id = ? AND rank >= ?')
         .run(categoryId, finalRank);
     }
 
     const submissionId = uuidv4();
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO submissions (id, category_id, title, description, image_url, external_id, external_type, notes, rank, is_private)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(submissionId, categoryId, title, description || null, imageUrl || null, 
@@ -98,7 +98,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
 router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const submission = db.prepare(`
+    const submission = await db.prepare(`
       SELECT s.*, c.is_private, c.user_id as category_owner_id, c.name as category_name
       FROM submissions s
       JOIN categories c ON s.category_id = c.id
@@ -117,18 +117,18 @@ router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => 
     }
 
     // Get like count and user's like status
-    const likeCount = db.prepare('SELECT COUNT(*) as count FROM likes WHERE submission_id = ?')
+    const likeCount = await db.prepare('SELECT COUNT(*) as count FROM likes WHERE submission_id = ?')
       .get(submission.id) as any;
     
     let isLiked = false;
     if (req.user) {
-      const userLike = db.prepare('SELECT id FROM likes WHERE submission_id = ? AND user_id = ?')
+      const userLike = await db.prepare('SELECT id FROM likes WHERE submission_id = ? AND user_id = ?')
         .get(submission.id, req.user.id);
       isLiked = Boolean(userLike);
     }
 
     // Get comments
-    const comments = db.prepare(`
+    const comments = await db.prepare(`
       SELECT c.*, u.username, u.display_name, u.avatar_url
       FROM comments c
       JOIN users u ON c.user_id = u.id
@@ -175,7 +175,7 @@ router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => 
 router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const submission = db.prepare(`
+    const submission = await db.prepare(`
       SELECT s.*, c.user_id as owner_id
       FROM submissions s
       JOIN categories c ON s.category_id = c.id
@@ -230,7 +230,7 @@ router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
       fields.push('updated_at = CURRENT_TIMESTAMP');
       values.push(req.params.id);
       
-      db.prepare(`UPDATE submissions SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+      await db.prepare(`UPDATE submissions SET ${fields.join(', ')} WHERE id = ?`).run(...values);
     }
 
     res.json({ message: 'Submission updated successfully' });
@@ -244,7 +244,7 @@ router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
 router.delete('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const submission = db.prepare(`
+    const submission = await db.prepare(`
       SELECT s.*, c.user_id as owner_id
       FROM submissions s
       JOIN categories c ON s.category_id = c.id
@@ -257,8 +257,8 @@ router.delete('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
     }
 
     // Soft delete and re-order ranks
-    db.prepare(`UPDATE submissions SET deleted_at = datetime('now') WHERE id = ?`).run(req.params.id);
-    db.prepare(`
+    await db.prepare(`UPDATE submissions SET deleted_at = datetime('now') WHERE id = ?`).run(req.params.id);
+    await db.prepare(`
       UPDATE submissions 
       SET rank = rank - 1 
       WHERE category_id = ? AND rank > ? AND deleted_at IS NULL
@@ -275,7 +275,7 @@ router.delete('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
 router.get('/deleted/list', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const deleted = db.prepare(`
+    const deleted = await db.prepare(`
       SELECT s.*, c.name as category_name, c.icon as category_icon
       FROM submissions s
       JOIN categories c ON s.category_id = c.id
@@ -303,7 +303,7 @@ router.get('/deleted/list', authMiddleware, (req: AuthRequest, res: Response) =>
 router.post('/:id/restore', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const submission = db.prepare(`
+    const submission = await db.prepare(`
       SELECT s.*, c.user_id as owner_id, c.max_items
       FROM submissions s
       JOIN categories c ON s.category_id = c.id
@@ -316,7 +316,7 @@ router.post('/:id/restore', authMiddleware, (req: AuthRequest, res: Response) =>
     }
 
     // Check if category is full
-    const currentCount = db.prepare(
+    const currentCount = await db.prepare(
       'SELECT COUNT(*) as count FROM submissions WHERE category_id = ? AND deleted_at IS NULL'
     ).get(submission.category_id) as any;
 
@@ -326,13 +326,13 @@ router.post('/:id/restore', authMiddleware, (req: AuthRequest, res: Response) =>
     }
 
     // Get new rank (add to end)
-    const maxRank = db.prepare(
+    const maxRank = await db.prepare(
       'SELECT MAX(rank) as max FROM submissions WHERE category_id = ? AND deleted_at IS NULL'
     ).get(submission.category_id) as any;
     const newRank = (maxRank.max || 0) + 1;
 
     // Restore submission
-    db.prepare(`
+    await db.prepare(`
       UPDATE submissions SET deleted_at = NULL, rank = ? WHERE id = ?
     `).run(newRank, req.params.id);
 
@@ -347,7 +347,7 @@ router.post('/:id/restore', authMiddleware, (req: AuthRequest, res: Response) =>
 router.delete('/:id/permanent', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const submission = db.prepare(`
+    const submission = await db.prepare(`
       SELECT s.*, c.user_id as owner_id
       FROM submissions s
       JOIN categories c ON s.category_id = c.id
@@ -359,7 +359,7 @@ router.delete('/:id/permanent', authMiddleware, (req: AuthRequest, res: Response
       return;
     }
 
-    db.prepare('DELETE FROM submissions WHERE id = ?').run(req.params.id);
+    await db.prepare('DELETE FROM submissions WHERE id = ?').run(req.params.id);
     res.json({ message: 'Permanently deleted' });
   } catch (error) {
     console.error('Permanent delete error:', error);
@@ -381,7 +381,7 @@ router.post('/reorder', authMiddleware, (req: AuthRequest, res: Response) => {
 
     // Verify all submissions belong to user's categories
     for (const sub of submissions) {
-      const existing = db.prepare(`
+      const existing = await db.prepare(`
         SELECT s.id FROM submissions s
         JOIN categories c ON s.category_id = c.id
         WHERE s.id = ? AND c.user_id = ?
@@ -394,7 +394,7 @@ router.post('/reorder', authMiddleware, (req: AuthRequest, res: Response) => {
     }
 
     // Update ranks in transaction
-    const updateStmt = db.prepare('UPDATE submissions SET rank = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+    const updateStmt = await db.prepare('UPDATE submissions SET rank = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
     const updateMany = db.transaction((items: { id: string; rank: number }[]) => {
       for (const item of items) {
         updateStmt.run(item.rank, item.id);
@@ -415,7 +415,7 @@ router.post('/:id/like', authMiddleware, (req: AuthRequest, res: Response) => {
     const db = getDb();
     
     // Verify submission exists and is accessible
-    const submission = db.prepare(`
+    const submission = await db.prepare(`
       SELECT s.id, c.is_private, c.user_id
       FROM submissions s
       JOIN categories c ON s.category_id = c.id
@@ -433,7 +433,7 @@ router.post('/:id/like', authMiddleware, (req: AuthRequest, res: Response) => {
     }
 
     // Check if already liked
-    const existingLike = db.prepare('SELECT id FROM likes WHERE submission_id = ? AND user_id = ?')
+    const existingLike = await db.prepare('SELECT id FROM likes WHERE submission_id = ? AND user_id = ?')
       .get(req.params.id, req.user!.id);
 
     if (existingLike) {
@@ -441,7 +441,7 @@ router.post('/:id/like', authMiddleware, (req: AuthRequest, res: Response) => {
       return;
     }
 
-    db.prepare('INSERT INTO likes (id, submission_id, user_id) VALUES (?, ?, ?)')
+    await db.prepare('INSERT INTO likes (id, submission_id, user_id) VALUES (?, ?, ?)')
       .run(uuidv4(), req.params.id, req.user!.id);
 
     res.json({ message: 'Liked successfully' });
@@ -455,7 +455,7 @@ router.post('/:id/like', authMiddleware, (req: AuthRequest, res: Response) => {
 router.delete('/:id/like', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const result = db.prepare('DELETE FROM likes WHERE submission_id = ? AND user_id = ?')
+    const result = await db.prepare('DELETE FROM likes WHERE submission_id = ? AND user_id = ?')
       .run(req.params.id, req.user!.id);
 
     if (result.changes === 0) {
@@ -486,7 +486,7 @@ router.post('/:id/comments', authMiddleware, (req: AuthRequest, res: Response) =
     const db = getDb();
     
     // Verify submission exists and is accessible
-    const submission = db.prepare(`
+    const submission = await db.prepare(`
       SELECT s.id, c.is_private, c.user_id
       FROM submissions s
       JOIN categories c ON s.category_id = c.id
@@ -504,7 +504,7 @@ router.post('/:id/comments', authMiddleware, (req: AuthRequest, res: Response) =
     }
 
     const commentId = uuidv4();
-    db.prepare('INSERT INTO comments (id, submission_id, user_id, content) VALUES (?, ?, ?, ?)')
+    await db.prepare('INSERT INTO comments (id, submission_id, user_id, content) VALUES (?, ?, ?, ?)')
       .run(commentId, req.params.id, req.user!.id, validation.data.content);
 
     res.status(201).json({

@@ -33,14 +33,14 @@ router.post('/register', async (req: Request, res: Response) => {
     const db = getDb();
 
     // Check if email exists
-    const existingEmail = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const existingEmail = await db.prepare('SELECT id FROM users WHERE email = ?').get(email);
     if (existingEmail) {
       res.status(409).json({ error: 'Email already registered' });
       return;
     }
 
     // Check if username exists
-    const existingUsername = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+    const existingUsername = await db.prepare('SELECT id FROM users WHERE username = ?').get(username);
     if (existingUsername) {
       res.status(409).json({ error: 'Username already taken' });
       return;
@@ -51,7 +51,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
     // Create user
     const userId = uuidv4();
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO users (id, email, username, password_hash, display_name)
       VALUES (?, ?, ?, ?, ?)
     `).run(userId, email, username, passwordHash, displayName || username);
@@ -88,7 +88,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const db = getDb();
 
     // Find user
-    const user = db.prepare(`
+    const user = await db.prepare(`
       SELECT id, email, username, password_hash, display_name, avatar_url
       FROM users WHERE email = ?
     `).get(email) as any;
@@ -130,10 +130,10 @@ router.post('/login', async (req: Request, res: Response) => {
 });
 
 // GET /api/auth/me - Get current user
-router.get('/me', authMiddleware, (req: AuthRequest, res: Response) => {
+router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const user = db.prepare(`
+    const user = await db.prepare(`
       SELECT id, email, username, display_name, avatar_url, bio, 
              is_private, created_at, language, theme
       FROM users WHERE id = ?
@@ -215,7 +215,7 @@ router.put('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       fields.push('updated_at = CURRENT_TIMESTAMP');
       values.push(req.user!.id);
       
-      db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+      await db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...values);
     }
 
     res.json({ message: 'Profile updated successfully' });

@@ -28,7 +28,7 @@ router.get('/trending', optionalAuthMiddleware, (req: AuthRequest, res: Response
     const db = getDb();
     
     // Get submissions with most likes in the period
-    const trending = db.prepare(`
+    const trending = await db.prepare(`
       SELECT 
         s.id, s.title, s.description, s.image_url, s.created_at,
         c.id as category_id, c.name as category_name,
@@ -76,7 +76,7 @@ router.get('/following', authMiddleware, (req: AuthRequest, res: Response) => {
 
     const db = getDb();
     
-    const feed = db.prepare(`
+    const feed = await db.prepare(`
       SELECT 
         s.id, s.title, s.description, s.image_url, s.rank, s.created_at,
         c.id as category_id, c.name as category_name,
@@ -124,7 +124,7 @@ router.get('/discover', optionalAuthMiddleware, (req: AuthRequest, res: Response
     const db = getDb();
     
     // Get popular public categories
-    const categories = db.prepare(`
+    const categories = await db.prepare(`
       SELECT 
         c.id, c.name, c.description, c.icon, c.color, c.created_at,
         u.id as user_id, u.username, u.display_name, u.avatar_url,
@@ -178,7 +178,7 @@ router.get('/search', optionalAuthMiddleware, (req: AuthRequest, res: Response) 
     const results: any = {};
 
     if (type === 'all' || type === 'submissions') {
-      const submissions = db.prepare(`
+      const submissions = await db.prepare(`
         SELECT 
           s.id, s.title, s.description, s.image_url, s.rank,
           c.id as category_id, c.name as category_name,
@@ -204,7 +204,7 @@ router.get('/search', optionalAuthMiddleware, (req: AuthRequest, res: Response) 
     }
 
     if (type === 'all' || type === 'categories') {
-      const categories = db.prepare(`
+      const categories = await db.prepare(`
         SELECT 
           c.id, c.name, c.description, c.icon, c.color,
           u.username,

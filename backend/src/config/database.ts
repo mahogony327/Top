@@ -1,106 +1,82 @@
-import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
-import fs from 'fs';
-import path from 'path';
+import { Pool } from 'pg';
 
-let db: SqlJsDatabase | null = null;
-let dbPath: string = '';
+let pool: Pool | null = null;
 
-console.log('Loading database module...');
-
-// Wrapper to make sql.js API similar to better-sqlite3
+// Wrapper to make PostgreSQL API similar to better-sqlite3
 class DatabaseWrapper {
-  private db: SqlJsDatabase;
+  private pool: Pool;
 
-  constructor(database: SqlJsDatabase) {
-    this.db = database;
+  constructor(p: Pool) {
+    this.pool = p;
   }
 
   prepare(sql: string) {
     const self = this;
+    // Convert ? placeholders to $1, $2, etc for PostgreSQL
+    let paramIndex = 0;
+    const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
+    
     return {
-      run(...params: any[]) {
-        self.db.run(sql, params);
-        save();
-        return { changes: self.db.getRowsModified() };
+      async run(...params: any[]) {
+        const result = await self.pool.query(pgSql, params);
+        return { changes: result.rowCount || 0 };
       },
-      get(...params: any[]) {
-        const stmt = self.db.prepare(sql);
-        stmt.bind(params);
-        if (stmt.step()) {
-          const row = stmt.getAsObject();
-          stmt.free();
-          return row;
-        }
-        stmt.free();
-        return undefined;
+      async get(...params: any[]) {
+        const result = await self.pool.query(pgSql, params);
+        return result.rows[0] || undefined;
       },
-      all(...params: any[]) {
-        const results: any[] = [];
-        const stmt = self.db.prepare(sql);
-        stmt.bind(params);
-        while (stmt.step()) {
-          results.push(stmt.getAsObject());
-        }
-        stmt.free();
-        return results;
+      async all(...params: any[]) {
+        const result = await self.pool.query(pgSql, params);
+        return result.rows;
       }
     };
   }
 
-  exec(sql: string) {
-    this.db.exec(sql);
-    save();
+  async exec(sql: string) {
+    await this.pool.query(sql);
   }
 
-  transaction<T>(fn: (items: T[]) => void) {
-    return (items: T[]) => {
-      this.db.run('BEGIN TRANSACTION');
+  transaction<T>(fn: (items: T[]) => Promise<void>) {
+    return async (items: T[]) => {
+      const client = await this.pool.connect();
       try {
-        fn(items);
-        this.db.run('COMMIT');
-        save();
+        await client.query('BEGIN');
+        await fn(items);
+        await client.query('COMMIT');
       } catch (e) {
-        this.db.run('ROLLBACK');
+        await client.query('ROLLBACK');
         throw e;
+      } finally {
+        client.release();
       }
     };
-  }
-}
-
-function save() {
-  if (db && dbPath) {
-    const data = db.export();
-    fs.writeFileSync(dbPath, Buffer.from(data));
   }
 }
 
 let dbWrapper: DatabaseWrapper | null = null;
 
 export async function initializeDatabase(): Promise<void> {
-  console.log('Initializing sql.js...');
-  const SQL = await initSqlJs({
-    locateFile: (file: string) => `https://sql.js.org/dist/${file}`
+  console.log('Connecting to PostgreSQL...');
+  
+  const connectionString = process.env.DATABASE_URL;
+  
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required');
+  }
+
+  pool = new Pool({
+    connectionString,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
   });
-  console.log('sql.js loaded successfully');
-  
-  const dataDir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
 
-  dbPath = path.join(dataDir, 'top.db');
-  
-  if (fs.existsSync(dbPath)) {
-    const buffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(buffer);
-  } else {
-    db = new SQL.Database();
-  }
+  // Test connection
+  await pool.query('SELECT NOW()');
+  console.log('PostgreSQL connected successfully');
 
-  dbWrapper = new DatabaseWrapper(db);
+  dbWrapper = new DatabaseWrapper(pool);
 
   // Create tables
-  db.exec(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
@@ -112,8 +88,8 @@ export async function initializeDatabase(): Promise<void> {
       is_private INTEGER DEFAULT 0,
       language TEXT DEFAULT 'en',
       theme TEXT DEFAULT 'system',
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS categories (
@@ -126,8 +102,8 @@ export async function initializeDatabase(): Promise<void> {
       is_private INTEGER DEFAULT 0,
       parent_id TEXT,
       max_items INTEGER DEFAULT 10,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS submissions (
@@ -141,23 +117,23 @@ export async function initializeDatabase(): Promise<void> {
       notes TEXT,
       rank INTEGER NOT NULL,
       is_private INTEGER DEFAULT 0,
-      deleted_at TEXT DEFAULT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      deleted_at TIMESTAMP DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS follows (
       id TEXT PRIMARY KEY,
       follower_id TEXT NOT NULL,
       following_id TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS likes (
       id TEXT PRIMARY KEY,
       submission_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS comments (
@@ -165,7 +141,7 @@ export async function initializeDatabase(): Promise<void> {
       submission_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
       content TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -174,7 +150,7 @@ export async function initializeDatabase(): Promise<void> {
       receiver_id TEXT NOT NULL,
       content TEXT NOT NULL,
       is_read INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS feedback (
@@ -182,11 +158,10 @@ export async function initializeDatabase(): Promise<void> {
       user_id TEXT,
       type TEXT NOT NULL,
       content TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
-  save();
   console.log('📦 Database initialized');
 }
 

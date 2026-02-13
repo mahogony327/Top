@@ -21,7 +21,7 @@ const createCategorySchema = z.object({
 router.get('/', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const categories = db.prepare(`
+    const categories = await db.prepare(`
       SELECT c.*, 
              (SELECT COUNT(*) FROM submissions WHERE category_id = c.id AND deleted_at IS NULL) as submission_count,
              pc.name as parent_name
@@ -65,7 +65,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
 
     // Validate parent exists and belongs to user
     if (parentId) {
-      const parent = db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?')
+      const parent = await db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?')
         .get(parentId, req.user!.id);
       if (!parent) {
         res.status(400).json({ error: 'Parent category not found' });
@@ -74,7 +74,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
     }
 
     const categoryId = uuidv4();
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO categories (id, user_id, name, description, icon, color, is_private, parent_id, max_items)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(categoryId, req.user!.id, name, description || null, icon || null, color || null, 
@@ -101,7 +101,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
 router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const category = db.prepare(`
+    const category = await db.prepare(`
       SELECT c.*, u.username, u.display_name as user_display_name
       FROM categories c
       JOIN users u ON c.user_id = u.id
@@ -121,7 +121,7 @@ router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => 
     }
 
     // Get submissions (excluding deleted)
-    const submissions = db.prepare(`
+    const submissions = await db.prepare(`
       SELECT s.*, 
              (SELECT COUNT(*) FROM likes WHERE submission_id = s.id) as like_count
       FROM submissions s
@@ -170,7 +170,7 @@ router.get('/:id', optionalAuthMiddleware, (req: AuthRequest, res: Response) => 
 router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const category = db.prepare('SELECT * FROM categories WHERE id = ? AND user_id = ?')
+    const category = await db.prepare('SELECT * FROM categories WHERE id = ? AND user_id = ?')
       .get(req.params.id, req.user!.id) as any;
 
     if (!category) {
@@ -226,7 +226,7 @@ router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
       fields.push('updated_at = CURRENT_TIMESTAMP');
       values.push(req.params.id);
       
-      db.prepare(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+      await db.prepare(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`).run(...values);
     }
 
     res.json({ message: 'Category updated successfully' });
@@ -240,7 +240,7 @@ router.put('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
 router.delete('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const category = db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?')
+    const category = await db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?')
       .get(req.params.id, req.user!.id);
 
     if (!category) {
@@ -249,8 +249,8 @@ router.delete('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
     }
 
     // Delete submissions first (cascade)
-    db.prepare('DELETE FROM submissions WHERE category_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
+    await db.prepare('DELETE FROM submissions WHERE category_id = ?').run(req.params.id);
+    await db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
 
     res.json({ message: 'Category deleted successfully' });
   } catch (error) {

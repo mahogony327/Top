@@ -9,7 +9,7 @@ const router = Router();
 router.get('/:username', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const user = db.prepare(`
+    const user = await db.prepare(`
       SELECT id, username, display_name, avatar_url, bio, is_private, created_at
       FROM users WHERE username = ?
     `).get(req.params.username) as any;
@@ -23,15 +23,15 @@ router.get('/:username', optionalAuthMiddleware, (req: AuthRequest, res: Respons
     const isPrivate = user.is_private && !isOwner;
 
     // Get follower/following counts
-    const followers = db.prepare('SELECT COUNT(*) as count FROM follows WHERE following_id = ?')
+    const followers = await db.prepare('SELECT COUNT(*) as count FROM follows WHERE following_id = ?')
       .get(user.id) as any;
-    const following = db.prepare('SELECT COUNT(*) as count FROM follows WHERE follower_id = ?')
+    const following = await db.prepare('SELECT COUNT(*) as count FROM follows WHERE follower_id = ?')
       .get(user.id) as any;
 
     // Check if current user follows this user
     let isFollowing = false;
     if (req.user && !isOwner) {
-      const follow = db.prepare('SELECT id FROM follows WHERE follower_id = ? AND following_id = ?')
+      const follow = await db.prepare('SELECT id FROM follows WHERE follower_id = ? AND following_id = ?')
         .get(req.user.id, user.id);
       isFollowing = Boolean(follow);
     }
@@ -39,7 +39,7 @@ router.get('/:username', optionalAuthMiddleware, (req: AuthRequest, res: Respons
     // Get public categories if not private
     let categories: any[] = [];
     if (!isPrivate) {
-      categories = db.prepare(`
+      categories = await db.prepare(`
         SELECT c.*, 
                (SELECT COUNT(*) FROM submissions WHERE category_id = c.id) as submission_count
         FROM categories c
@@ -84,7 +84,7 @@ router.get('/:username', optionalAuthMiddleware, (req: AuthRequest, res: Respons
 router.post('/:username/follow', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const targetUser = db.prepare('SELECT id, username FROM users WHERE username = ?')
+    const targetUser = await db.prepare('SELECT id, username FROM users WHERE username = ?')
       .get(req.params.username) as any;
 
     if (!targetUser) {
@@ -98,7 +98,7 @@ router.post('/:username/follow', authMiddleware, (req: AuthRequest, res: Respons
     }
 
     // Check if already following
-    const existingFollow = db.prepare('SELECT id FROM follows WHERE follower_id = ? AND following_id = ?')
+    const existingFollow = await db.prepare('SELECT id FROM follows WHERE follower_id = ? AND following_id = ?')
       .get(req.user!.id, targetUser.id);
 
     if (existingFollow) {
@@ -106,7 +106,7 @@ router.post('/:username/follow', authMiddleware, (req: AuthRequest, res: Respons
       return;
     }
 
-    db.prepare('INSERT INTO follows (id, follower_id, following_id) VALUES (?, ?, ?)')
+    await db.prepare('INSERT INTO follows (id, follower_id, following_id) VALUES (?, ?, ?)')
       .run(uuidv4(), req.user!.id, targetUser.id);
 
     res.json({ message: 'Following successfully' });
@@ -120,7 +120,7 @@ router.post('/:username/follow', authMiddleware, (req: AuthRequest, res: Respons
 router.delete('/:username/follow', authMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const targetUser = db.prepare('SELECT id FROM users WHERE username = ?')
+    const targetUser = await db.prepare('SELECT id FROM users WHERE username = ?')
       .get(req.params.username) as any;
 
     if (!targetUser) {
@@ -128,7 +128,7 @@ router.delete('/:username/follow', authMiddleware, (req: AuthRequest, res: Respo
       return;
     }
 
-    const result = db.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?')
+    const result = await db.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?')
       .run(req.user!.id, targetUser.id);
 
     if (result.changes === 0) {
@@ -147,7 +147,7 @@ router.delete('/:username/follow', authMiddleware, (req: AuthRequest, res: Respo
 router.get('/:username/followers', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const user = db.prepare('SELECT id, is_private FROM users WHERE username = ?')
+    const user = await db.prepare('SELECT id, is_private FROM users WHERE username = ?')
       .get(req.params.username) as any;
 
     if (!user) {
@@ -161,7 +161,7 @@ router.get('/:username/followers', optionalAuthMiddleware, (req: AuthRequest, re
       return;
     }
 
-    const followers = db.prepare(`
+    const followers = await db.prepare(`
       SELECT u.id, u.username, u.display_name, u.avatar_url
       FROM follows f
       JOIN users u ON f.follower_id = u.id
@@ -186,7 +186,7 @@ router.get('/:username/followers', optionalAuthMiddleware, (req: AuthRequest, re
 router.get('/:username/following', optionalAuthMiddleware, (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
-    const user = db.prepare('SELECT id, is_private FROM users WHERE username = ?')
+    const user = await db.prepare('SELECT id, is_private FROM users WHERE username = ?')
       .get(req.params.username) as any;
 
     if (!user) {
@@ -200,7 +200,7 @@ router.get('/:username/following', optionalAuthMiddleware, (req: AuthRequest, re
       return;
     }
 
-    const following = db.prepare(`
+    const following = await db.prepare(`
       SELECT u.id, u.username, u.display_name, u.avatar_url
       FROM follows f
       JOIN users u ON f.following_id = u.id
@@ -222,7 +222,7 @@ router.get('/:username/following', optionalAuthMiddleware, (req: AuthRequest, re
 });
 
 // GET /api/users/search?q=query - Search users
-router.get('/', (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const query = req.query.q as string;
     if (!query || query.length < 2) {
@@ -231,7 +231,7 @@ router.get('/', (req: AuthRequest, res: Response) => {
     }
 
     const db = getDb();
-    const users = db.prepare(`
+    const users = await db.prepare(`
       SELECT id, username, display_name, avatar_url
       FROM users
       WHERE (username LIKE ? OR display_name LIKE ?) AND is_private = 0
